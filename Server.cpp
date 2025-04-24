@@ -9,7 +9,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const int PORT = 8080;
+const int PORT = 8000;
 
 void mirrorRow(vector<vector<int>>& matrix, int i, int n)
 {
@@ -64,73 +64,68 @@ void sendDouble(SOCKET sock, double value)
 
 void handleClient(SOCKET clientSocket)
 {
-    char command[16] = {};
+    vector<vector<int>> matrix;
+    int n = 0, numThreads = 0;
 
-    recv(clientSocket, command, sizeof(command), 0);
-
-    if (strcmp(command, "HELLO") == 0)
+    while (true)
     {
-        cout << "Received: HELLO\n";
-        const char* ack = "ACK_HELLO";
-        send(clientSocket, ack, 16, 0);
-    }
+        char command[16] = {};
+        int bytesRead = recv(clientSocket, command, sizeof(command), 0);
 
-    recv(clientSocket, command, sizeof(command), 0);
+        if (bytesRead <= 0) break;
 
-    if (strcmp(command, "SEND_DATA") == 0)
-    {
-        cout << "Receiving data...\n";
-        int n = recvInt(clientSocket);
-        int numThreads = recvInt(clientSocket);
-
-        vector<vector<int>> matrix(n, vector<int>(n));
-
-        for (int i = 0; i < n; ++i)
+        if (strcmp(command, "HELLO") == 0)
         {
-            for (int j = 0; j < n; ++j)
+            cout << "Received: HELLO\n";
+            const char* ack = "ACK_HELLO";
+            send(clientSocket, ack, 16, 0);
+        }
+        else if (strcmp(command, "SEND_DATA") == 0)
+        {
+            n = recvInt(clientSocket);
+            numThreads = recvInt(clientSocket);
+            matrix.assign(n, vector<int>(n));
+
+            for (int i = 0; i < n; ++i)
             {
-                matrix[i][j] = recvInt(clientSocket);
-            }                
-        }            
-
-        recv(clientSocket, command, sizeof(command), 0);
-
-        if (strcmp(command, "START_COMPUTATION") == 0)
+                for (int j = 0; j < n; ++j)
+                {
+                    matrix[i][j] = recvInt(clientSocket);
+                }
+            }           
+        }
+        else if (strcmp(command, "START_COMPUTATION") == 0)
         {
             auto start = high_resolution_clock::now();
             mirrorMatrix(matrix, n, numThreads);
             auto end = high_resolution_clock::now();
             double seconds = duration_cast<nanoseconds>(end - start).count() * 1e-9;
-
-            recv(clientSocket, command, sizeof(command), 0);
-
-            if (strcmp(command, "GET_STATUS") == 0)
+        }
+        else if (strcmp(command, "GET_STATUS") == 0)
+        {
+            const char* status = "READY";
+            send(clientSocket, status, 16, 0);
+        }
+        else if (strcmp(command, "GET_RESULT") == 0)
+        {
+            for (int i = 0; i < n; ++i)
             {
-                const char* status = "READY";
-                send(clientSocket, status, 16, 0);
-            }
-
-            recv(clientSocket, command, sizeof(command), 0);
-
-            if (strcmp(command, "GET_RESULT") == 0)
-            {
-                sendInt(clientSocket, (int)(seconds * 1e9));
-
-                for (int i = 0; i < n; ++i)
+                for (int j = 0; j < n; ++j)
                 {
-                    for (int j = 0; j < n; ++j)
-                    {
-                        sendInt(clientSocket, matrix[i][j]);
-                    }
-                }                            
-            }
+                    sendInt(clientSocket, matrix[i][j]);
+                }
+            }        
+        }
+        else if (strcmp(command, "EXIT") == 0)
+        {
+            cout << "Client sent EXIT. Closing connection." << endl;
+            break;
         }
     }
 
     closesocket(clientSocket);
     cout << "Client disconnected." << endl;
 }
-
 
 int main()
 {
