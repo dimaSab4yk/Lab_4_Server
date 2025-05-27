@@ -57,11 +57,6 @@ void sendInt(SOCKET sock, int value)
     send(sock, (char*)&netVal, sizeof(netVal), 0);
 }
 
-void sendDouble(SOCKET sock, double value)
-{
-    send(sock, (char*)&value, sizeof(value), 0);
-}
-
 void handleClient(SOCKET clientSocket)
 {
     vector<vector<int>> matrix;
@@ -92,7 +87,7 @@ void handleClient(SOCKET clientSocket)
                 {
                     matrix[i][j] = recvInt(clientSocket);
                 }
-            }           
+            }
         }
         else if (strcmp(command, "START_COMPUTATION") == 0)
         {
